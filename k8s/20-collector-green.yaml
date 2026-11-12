@@ -1,0 +1,24 @@
+# Task 16: blue-green deployment of a new micro-collector version.
+# Green is deployed next to blue, then the Service selector is switched.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micro-collector-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {app: micro-collector, slot: green}
+  template:
+    metadata:
+      labels: {app: micro-collector, slot: green, version: v1.1}
+    spec:
+      containers:
+        - name: micro-collector
+          image: micro-collector:1.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: RECIPIENT_URL, value: "http://micro-recipient:8082"}
+            - {name: DB_URL, value: "jdbc:postgresql://postgres:5432/messages"}
+            - {name: COLLECT_INTERVAL_SECONDS, value: "10"}
+          ports:
+            - {containerPort: 8083}

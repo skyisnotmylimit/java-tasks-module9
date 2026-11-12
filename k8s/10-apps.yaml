@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micro-sender
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: micro-sender}
+  template:
+    metadata:
+      labels: {app: micro-sender}
+    spec:
+      containers:
+        - name: micro-sender
+          image: micro-sender:1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: RABBITMQ_HOST, value: rabbitmq}
+          ports:
+            - {containerPort: 8081}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: micro-sender
+spec:
+  type: NodePort
+  selector: {app: micro-sender}
+  ports:
+    - {port: 8081, nodePort: 30081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micro-recipient-v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: micro-recipient, version: v1}
+  template:
+    metadata:
+      labels: {app: micro-recipient, version: v1}
+    spec:
+      containers:
+        - name: micro-recipient
+          image: micro-recipient:1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: RABBITMQ_HOST, value: rabbitmq}
+            - {name: POLL_INTERVAL_SECONDS, value: "5"}
+            - {name: SINGLE_MESSAGE_PER_CALL, value: "false"}
+          ports:
+            - {containerPort: 8082}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: micro-recipient
+spec:
+  selector: {app: micro-recipient}
+  ports:
+    - {port: 8082}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micro-visualizer
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: micro-visualizer}
+  template:
+    metadata:
+      labels: {app: micro-visualizer}
+    spec:
+      containers:
+        - name: micro-visualizer
+          image: micro-visualizer:1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: DB_URL, value: "jdbc:postgresql://postgres:5432/messages"}
+          ports:
+            - {containerPort: 8084}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: micro-visualizer
+spec:
+  type: NodePort
+  selector: {app: micro-visualizer}
+  ports:
+    - {port: 8084, nodePort: 30084}
+---
+# Blue slot: the currently live micro-collector (task 20: 3 replicas)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micro-collector-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {app: micro-collector, slot: blue}
+  template:
+    metadata:
+      labels: {app: micro-collector, slot: blue, version: v1}
+    spec:
+      containers:
+        - name: micro-collector
+          image: micro-collector:1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: RECIPIENT_URL, value: "http://micro-recipient:8082"}
+            - {name: DB_URL, value: "jdbc:postgresql://postgres:5432/messages"}
+            - {name: COLLECT_INTERVAL_SECONDS, value: "10"}
+          ports:
+            - {containerPort: 8083}
+---
+# Live service; the selector "slot" is switched for blue-green
+apiVersion: v1
+kind: Service
+metadata:
+  name: micro-collector
+spec:
+  selector: {app: micro-collector, slot: blue}
+  ports:
+    - {port: 8083}
+---
+# Headless service selecting every collector replica of every slot: used by Prometheus (task 21)
+apiVersion: v1
+kind: Service
+metadata:
+  name: micro-collector-metrics
+spec:
+  clusterIP: None
+  selector: {app: micro-collector}
+  ports:
+    - {port: 8083}

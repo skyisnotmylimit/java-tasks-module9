@@ -1,0 +1,94 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks: [sender, recipient]
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: messages
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    networks: [recipient]
+
+  micro-sender:
+    build:
+      context: .
+      args:
+        MODULE: micro-sender
+    image: micro-sender:1.0
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8081:8081"
+    depends_on: [rabbitmq]
+    networks: [sender]
+
+  micro-recipient:
+    build:
+      context: .
+      args:
+        MODULE: micro-recipient
+    image: micro-recipient:1.0
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      POLL_INTERVAL_SECONDS: 5
+    ports:
+      - "8082:8082"
+    depends_on: [rabbitmq]
+    networks: [recipient]
+
+  micro-collector:
+    build:
+      context: .
+      args:
+        MODULE: micro-collector
+    image: micro-collector:1.0
+    environment:
+      RECIPIENT_URL: http://micro-recipient:8082
+      DB_URL: jdbc:postgresql://postgres:5432/messages
+      COLLECT_INTERVAL_SECONDS: 10
+    deploy:
+      replicas: 2
+    depends_on: [micro-recipient, postgres]
+    networks: [recipient]
+
+  micro-visualizer:
+    build:
+      context: .
+      args:
+        MODULE: micro-visualizer
+    image: micro-visualizer:1.0
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/messages
+    ports:
+      - "8084:8084"
+    depends_on: [postgres]
+    networks: [recipient]
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks: [sender, recipient, monitoring]
+
+  grafana:
+    image: grafana/grafana
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+    networks: [monitoring]
+
+networks:
+  sender:
+  recipient:
+  monitoring:

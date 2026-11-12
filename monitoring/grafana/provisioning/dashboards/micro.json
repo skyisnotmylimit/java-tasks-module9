@@ -1,0 +1,40 @@
+{
+  "title": "Micro services",
+  "uid": "micro-services",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Notifications sent (sender_notifications_sent_total)",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sender_notifications_sent_total", "legendFormat": "sent" } ]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Random load (sender_random_load)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sender_random_load", "legendFormat": "load" } ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "HTTP requests / s by service",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sum by (application) (rate(http_server_requests_seconds_count[1m]))", "legendFormat": "{{application}}" } ]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "JVM heap used per instance",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sum by (application, instance) (jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "{{application}} {{instance}}" } ]
+    },
+    {
+      "id": 5, "type": "stat", "title": "Targets up",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "up", "legendFormat": "{{job}} {{instance}}" } ]
+    }
+  ]
+}

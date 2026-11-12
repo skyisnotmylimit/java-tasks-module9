@@ -1,0 +1,48 @@
+# Task 18/19: canary release of micro-recipient v2 and micro-collector v2
+# (one message per call, collector interval 5*N = 25s).
+# The canary pods carry the same "app" label, so the Services / the headless metrics service include them.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micro-recipient-v2-canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: micro-recipient, version: v2}
+  template:
+    metadata:
+      labels: {app: micro-recipient, version: v2}
+    spec:
+      containers:
+        - name: micro-recipient
+          image: micro-recipient:2.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: RABBITMQ_HOST, value: rabbitmq}
+            - {name: POLL_INTERVAL_SECONDS, value: "5"}
+            - {name: SINGLE_MESSAGE_PER_CALL, value: "true"}
+          ports:
+            - {containerPort: 8082}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micro-collector-v2-canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: micro-collector, slot: canary}
+  template:
+    metadata:
+      labels: {app: micro-collector, slot: canary, version: v2}
+    spec:
+      containers:
+        - name: micro-collector
+          image: micro-collector:2.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: RECIPIENT_URL, value: "http://micro-recipient:8082"}
+            - {name: DB_URL, value: "jdbc:postgresql://postgres:5432/messages"}
+            - {name: COLLECT_INTERVAL_SECONDS, value: "25"}
+          ports:
+            - {containerPort: 8083}
